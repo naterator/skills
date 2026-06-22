@@ -22,4 +22,4 @@ defines when to use it and the workflow it should follow.
 
 ## License
 
-This repository is licensed under the BSD 3-Clause License.
+This repository is licensed under the [BSD 3-Clause License](LICENSE).

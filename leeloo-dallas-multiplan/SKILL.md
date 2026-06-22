@@ -98,11 +98,15 @@ Map commands to `name-id` values:
 - `gemini`: fourth command
 
 Prefer `functions.exec_command` sessions so long-running CLIs can be polled to
-completion. If network, authentication, process, or filesystem restrictions
-block a CLI, request escalation according to the active permissions policy. If
-one external CLI remains unavailable after reasonable retry, continue with the
-plans that were successfully produced and state the missing plan in the final
-master plan assumptions.
+completion. Claude may legitimately take a long time: when the `claude` pass
+starts successfully, keep polling it for up to 30 minutes of wall-clock time
+before treating it as hung or unavailable. Use normal shorter retry judgment for
+the other external CLIs unless the user explicitly grants a longer wait. If
+network, authentication, process, or filesystem restrictions block a CLI,
+request escalation according to the active permissions policy. If one external
+CLI remains unavailable after reasonable retry, continue with the plans that
+were successfully produced and state the missing plan in the final master plan
+assumptions.
 
 ### Phase 3: Synthesize the Final Master Plan
 

@@ -78,13 +78,22 @@ by a prompt that includes:
 - the target output path `plans/[PTC]-[name-id].md`
 - instructions to inspect the repo before planning
 - instructions to write a detailed, decision-complete implementation plan
-- instructions to avoid implementation or repo mutations beyond writing that
-  one plan file
+- instructions to avoid implementation or unrelated repo mutations
+- for non-Claude CLIs, instructions to write only that one plan file
+- for Claude, instructions to print only the complete Markdown plan to stdout
+  and perform no file writes
+
+For Claude only, use a stdout-capture strategy instead of asking Claude to edit
+the repository. The Claude prompt must instruct Claude to inspect the repository
+read-only, print the complete Markdown plan to stdout, and not write, edit, or
+mutate files. The outer Codex command is responsible for redirecting stdout to
+`plans/[PTC]-claude.md`. This avoids Claude's interactive write approval while
+keeping the multiplan run in control of file creation.
 
 Commands:
 
 ```bash
-claude --model opus --effort xhigh -p "[PROMPTHERE]"
+claude --model opus --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob,LS -p "[PROMPTHERE]" > "plans/[PTC]-claude.md"
 grok --no-alt-screen --always-approve --effort xhigh --model grok-build -p "[PROMPTHERE]"
 grok --no-alt-screen --always-approve --effort xhigh --model grok-composer-2.5-fast -p "[PROMPTHERE]"
 agy --model "Gemini 3.1 Pro (High)" --print "[PROMPTHERE]"
@@ -100,13 +109,14 @@ Map commands to `name-id` values:
 Prefer `functions.exec_command` sessions so long-running CLIs can be polled to
 completion. Claude may legitimately take a long time: when the `claude` pass
 starts successfully, keep polling it for up to 30 minutes of wall-clock time
-before treating it as hung or unavailable. Use normal shorter retry judgment for
-the other external CLIs unless the user explicitly grants a longer wait. If
-network, authentication, process, or filesystem restrictions block a CLI,
-request escalation according to the active permissions policy. If one external
-CLI remains unavailable after reasonable retry, continue with the plans that
-were successfully produced and state the missing plan in the final master plan
-assumptions.
+before treating it as hung or unavailable. After Claude exits, verify
+`plans/[PTC]-claude.md` exists and is non-empty before counting the Claude pass
+as successful. Use normal shorter retry judgment for the other external CLIs
+unless the user explicitly grants a longer wait. If network, authentication,
+process, or filesystem restrictions block a CLI, request escalation according to
+the active permissions policy. If one external CLI remains unavailable after
+reasonable retry, continue with the plans that were successfully produced and
+state the missing plan in the final master plan assumptions.
 
 ### Phase 3: Synthesize the Final Master Plan
 

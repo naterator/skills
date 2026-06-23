@@ -21,6 +21,27 @@ Accept one input parameter:
 If the target is ambiguous, inspect the repository first. Ask the user only for
 product or tradeoff decisions that cannot be discovered locally.
 
+## Required Access
+
+This skill requires full filesystem, command, and network access because it
+creates multiple plan files and invokes external LLM CLIs.
+
+Before doing any task actions, check the current environment/sandbox context.
+If the session is not running with `sandbox_mode=danger-full-access` or an
+equivalent full-access mode, stop immediately. Do not inspect the repository,
+create plan titles, launch external CLIs, request partial escalation, attempt a
+fallback workflow, or create any plan files.
+
+Tell the user:
+
+```text
+This skill requires full access. Please restart Codex with
+`--sandbox danger-full-access` or an equivalent full-access profile, then invoke
+the skill again.
+```
+
+Do not proceed until the user starts a new full-access session.
+
 ## Plan Title
 
 Create `[PTC]` locally; do not depend on another skill.

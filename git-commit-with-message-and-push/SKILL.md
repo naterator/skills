@@ -63,10 +63,34 @@ Inspect the current changes, draft a commit-ready message, and then run
    - Run `git commit` as its own standalone command.
 7. Run `git push origin main`.
    - Run `git push origin main` as its own standalone command.
+   - When the execution environment supports host or elevated execution,
+     use it for the first push attempt so SSH credentials are available.
+   - If an SSH push fails with `Permission denied (publickey)`, follow the
+     SSH agent recovery procedure below instead of repeatedly retrying.
 8. Report the commit and push result briefly after both commands succeed.
 9. If there are no meaningful changes, say so and do not create an empty
    commit.
 
+## SSH Agent Recovery
+
+When an SSH remote works in the user's terminal but not in the execution
+environment:
+
+1. Run `ssh-add -l` to check whether this process has an SSH agent.
+2. If no agent is available, describe the problem as a missing SSH agent,
+   not as a repository access-rights failure.
+3. On macOS, use a non-interactive verbose SSH check to identify a local
+   key the server accepts. Start a short-lived agent with a unique socket
+   under `/private/tmp`, then load that key with
+   `ssh-add --apple-use-keychain <accepted-key>`.
+4. Set `SSH_AUTH_SOCK` only for the standalone `git push origin main`
+   command. Keep the push elevated when host execution is available.
+5. Terminate the short-lived agent after the push, including when the push
+   fails.
+
+Do not change the remote URL or the user's persistent SSH configuration as
+part of recovery. If the key cannot be loaded non-interactively, stop and
+ask the user to attach an agent or restore authentication.
 
 ## Output Rules
 

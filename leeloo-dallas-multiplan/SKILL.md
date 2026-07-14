@@ -1,6 +1,6 @@
 ---
 name: leeloo-dallas-multiplan
-description: Create multi-model implementation plans for a user-supplied planning target. Use when the user asks Codex to generate, compare, synthesize, or write a final master plan using Codex plus external LLM CLIs such as claude, grok, composer, or gemini, especially when the desired output is plan files under plans/[title]-[name-id].md.
+description: Create multi-model implementation plans for a user-supplied planning target. Use when the user asks Codex to generate, compare, synthesize, or write a final master plan using Codex plus external LLM CLIs such as Claude and Grok, especially when the desired output is plan files under plans/[title]-[name-id].md.
 ---
 
 # Leeloo Dallas Multiplan
@@ -70,7 +70,6 @@ Use these exact `name-id` values:
 - `claude`
 - `grok`
 - `composer`
-- `gemini`
 - `final`
 
 ## Workflow
@@ -125,7 +124,6 @@ Commands:
 claude --model fable --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob,LS -p "[PROMPTHERE]" > "plans/[PTC]-claude.md"
 grok --no-alt-screen --always-approve --effort xhigh --model grok-4.5 -p "[PROMPTHERE]"
 grok --no-alt-screen --always-approve --effort xhigh --model grok-composer-2.5-fast -p "[PROMPTHERE]"
-agy --model "Gemini 3.1 Pro (High)" --print "[PROMPTHERE]"
 ```
 
 Map commands to `name-id` values:
@@ -133,7 +131,6 @@ Map commands to `name-id` values:
 - `claude`: first command
 - `grok`: second command
 - `composer`: third command
-- `gemini`: fourth command
 
 Prefer `functions.exec_command` sessions so long-running CLIs can be polled to
 completion. Claude may legitimately take a long time: when the `claude` pass

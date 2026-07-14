@@ -122,7 +122,7 @@ Commands:
 
 ```bash
 claude --model fable --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob,LS -p "[PROMPTHERE]" > "plans/[PTC]-claude.md"
-grok --no-alt-screen --always-approve --effort xhigh --model grok-4.5 -p "[PROMPTHERE]"
+grok --no-alt-screen --always-approve --effort high --model grok-4.5 -p "[PROMPTHERE]"
 grok --no-alt-screen --always-approve --effort xhigh --model grok-composer-2.5-fast -p "[PROMPTHERE]"
 ```
 

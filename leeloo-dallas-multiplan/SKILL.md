@@ -78,16 +78,24 @@ Use these exact `name-id` values:
 Run phases 1 and 2 concurrently when possible. Run phase 3 only after every
 available phase 1/2 plan has been written.
 
-### Phase 1: Create the GPT Plan
+### Phase 1: Ask Codex for the GPT Plan
 
-Create your own detailed implementation plan for `plan_target` as `gpt`.
+Run the Codex CLI with the `gpt-5.6-sol` model and `max` reasoning effort. Use
+this exact command shape, with `[PROMPTHERE]` replaced by a prompt containing
+the exact `plan_target`, resolved `[PTC]`, target output path, and instructions
+to inspect the relevant repository code and docs read-only before planning:
 
-Before writing, inspect the relevant repository code and docs enough to ground
-the plan in actual files, APIs, tests, and constraints. Write the plan to:
-
-```text
-plans/[PTC]-gpt.md
+```bash
+codex exec --model gpt-5.6-sol -c 'model_reasoning_effort="max"' --sandbox read-only -C . --output-last-message "plans/[PTC]-gpt.md" "[PROMPTHERE]"
 ```
+
+The prompt must instruct Codex to return only the complete Markdown plan in its
+final message, make no file writes, and produce a detailed, decision-complete
+plan grounded in actual files, APIs, tests, and constraints. The outer Codex
+command is responsible for capturing the final message in
+`plans/[PTC]-gpt.md`. After Codex exits, verify that file exists and is
+non-empty before counting the GPT pass as successful. Do not substitute the
+active model or another GPT model if this pass is unavailable.
 
 ### Phase 2: Ask External LLM CLIs for Plans
 
@@ -114,8 +122,8 @@ keeping the multiplan run in control of file creation.
 Commands:
 
 ```bash
-claude --model opus --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob,LS -p "[PROMPTHERE]" > "plans/[PTC]-claude.md"
-grok --no-alt-screen --always-approve --effort xhigh --model grok-build -p "[PROMPTHERE]"
+claude --model fable --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob,LS -p "[PROMPTHERE]" > "plans/[PTC]-claude.md"
+grok --no-alt-screen --always-approve --effort xhigh --model grok-4.5 -p "[PROMPTHERE]"
 grok --no-alt-screen --always-approve --effort xhigh --model grok-composer-2.5-fast -p "[PROMPTHERE]"
 agy --model "Gemini 3.1 Pro (High)" --print "[PROMPTHERE]"
 ```

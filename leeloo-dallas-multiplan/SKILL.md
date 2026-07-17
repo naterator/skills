@@ -69,7 +69,6 @@ Use these exact `name-id` values:
 - `gpt`
 - `claude`
 - `grok`
-- `composer`
 - `final`
 
 ## Workflow
@@ -123,14 +122,12 @@ Commands:
 ```bash
 claude --model fable --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob,LS -p "[PROMPTHERE]" > "plans/[PTC]-claude.md"
 grok --no-alt-screen --always-approve --effort high --model grok-4.5 -p "[PROMPTHERE]"
-grok --no-alt-screen --always-approve --effort xhigh --model grok-composer-2.5-fast -p "[PROMPTHERE]"
 ```
 
 Map commands to `name-id` values:
 
 - `claude`: first command
 - `grok`: second command
-- `composer`: third command
 
 Prefer `functions.exec_command` sessions so long-running CLIs can be polled to
 completion. Claude may legitimately take a long time: when the `claude` pass

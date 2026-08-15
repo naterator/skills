@@ -9,67 +9,76 @@ description: Draft and execute a git commit using a commit-formatted
 
 # Git Commit With Message And Push
 
-Inspect the current changes, draft a commit-ready message, and then run
-`git commit` with that message before pushing `origin main`.
+Review the current changes, create one commit-formatted message, stage the
+requested worktree, commit it, and push `origin main`.
+
+## Fast Path
+
+Use the fast path when Codex created or already reviewed the changes in the
+current task and the worktree has not changed since validation:
+
+- Trust the current task context. Do not reread source diffs or rerun tests.
+- Run the required preflight checks, preferably together in one parallel
+  read-only tool call.
+- Continue with staging, one staged-patch check, commit, push, and final
+  verification.
+
+Read only targeted diffs when the worktree is unfamiliar, contains unexpected
+files, has changed since review, or its intent is unclear. Do not read a broad
+full diff by default.
 
 ## Workflow
 
-1. Inspect the current change set before drafting.
-   - Start with `git status --short`.
-   - Use `git diff --stat` and `git diff --cached --stat`.
-   - Read targeted diffs when the intent is unclear.
-2. Infer the primary change theme.
-   - Prefer one coherent commit message for the visible change set.
-   - If the worktree contains obviously unrelated edits, say so briefly
-     and summarize only the likely intended subset when possible.
-3. Draft a git commit-formatted message for the current change set.
-   - Use exactly this structure:
-     ```text
-     <type>: <summary>
+1. Run one read-only preflight from the repository root:
+   - `git status --short`
+   - `git diff --stat`
+   - `git diff --cached --stat`
+   - inspect the repo-root `.codex` path
+   Run independent checks in parallel when supported. If there are no
+   meaningful changes, stop without creating an empty commit.
+2. Confirm scope and intent:
+   - Prefer one coherent commit for the visible change set.
+   - A request for "all files" authorizes every eligible visible change.
+   - If unrelated changes exist and the user did not authorize all files,
+     report them and stop before committing.
+3. Draft the message using exactly this structure:
+   ```text
+   <type>: <specific imperative summary>
 
-     - item detail 1
-     - item detail 2
-     - item detail 3
-     - additional item details as needed
-     ```
-   - Use a conventional type like `feat`, `fix`, `refactor`, `docs`,
-     `test`, or `chore` when it is clear from the diff.
-   - The first line must be the one-line summary.
-   - Put exactly one blank line between the summary and the first bullet.
-   - Use flat `- ` bullets for further details.
-   - Include as many bullets as needed to adequately summarize the
-     meaningful changes; do not default to exactly three bullets.
-   - Do not insert blank lines between bullet points. The bullet list must
-     be contiguous.
-4. Keep every line at 72 characters or less.
-5. Stage all current worktree changes from the repository root.
-   - Include every modified, deleted, newly created, untracked, and
-     unstaged file shown by `git status --short`.
-   - Treat a request to commit the current worktree as permission to
-     include all visible worktree changes by default.
-   - The repo-root `.codex` safety rules below are mandatory exceptions
-     and always override the include-all default.
-   - If the user explicitly asks for partial staging, follow that instead.
-   - Never create, stage, or commit a repo-root `.codex` file.
-   - If an empty untracked repo-root `.codex` file is present, remove it
-     before staging and continue.
-   - If a repo-root `.codex` path exists and is not an obvious transient
-     empty file, stop and ask the user before touching it.
-   - Run `git add` as its own standalone command.
-6. Run `git commit` using the drafted subject and body.
-   - Do not use interactive git workflows.
-   - Prefer a normal multi-line commit message.
-   - Never amend an existing commit unless the user explicitly asks.
-   - Run `git commit` as its own standalone command.
-7. Run `git push origin main`.
-   - Run `git push origin main` as its own standalone command.
-   - When the execution environment supports host or elevated execution,
-     use it for the first push attempt so SSH credentials are available.
-   - If an SSH push fails with `Permission denied (publickey)`, follow the
-     SSH agent recovery procedure below instead of repeatedly retrying.
-8. Report the commit and push result briefly after both commands succeed.
-9. If there are no meaningful changes, say so and do not create an empty
-   commit.
+   - high-signal behavior or architectural detail
+   - additional detail as needed
+   ```
+   Use a conventional type such as `feat`, `fix`, `refactor`, `docs`, `test`,
+   or `chore`. Keep every line at 72 characters or less, use one blank line
+   after the subject, and keep the flat bullet list contiguous. Describe
+   behavior and intent rather than listing files.
+4. Stage the requested changes with standalone `git add`:
+   - By default include every modified, deleted, untracked, and unstaged file.
+   - Follow an explicit partial-staging request instead.
+   - Never create, stage, or commit a repo-root `.codex` path.
+   - Remove an empty untracked repo-root `.codex` file before staging.
+   - If repo-root `.codex` is not an obvious empty transient file, stop and
+     ask before touching it.
+5. Verify the staged result once, preferably in one parallel read-only call:
+   - `git status --short`
+   - `git diff --cached --stat`
+   - `git diff --cached --check`
+   Confirm no eligible files were omitted. Do not repeat an unstaged
+   `git diff --check`. If nothing is staged, stop.
+6. Run standalone, non-interactive `git commit` with the drafted message.
+   Never amend unless the user explicitly requests it.
+7. Run standalone `git push origin main`. Use host or elevated execution on
+   the first attempt when available. On `Permission denied (publickey)`, use
+   the recovery procedure below instead of repeatedly retrying.
+8. Verify in one read-only call that the worktree is clean and
+   `git rev-parse HEAD` equals `git rev-parse origin/main`.
+9. Report the commit hash and subject briefly.
+
+Do not rerun tests or builds when they already passed for the unchanged
+worktree. Do not run `git diff --name-status` when status already provides the
+needed inventory. Do not reread the commit subject when commit output already
+reported it. Keep `git add`, `git commit`, and `git push` as separate commands;
+never join them with shell operators.
 
 ## SSH Agent Recovery
 
@@ -91,48 +100,3 @@ environment:
 Do not change the remote URL or the user's persistent SSH configuration as
 part of recovery. If the key cannot be loaded non-interactively, stop and
 ask the user to attach an agent or restore authentication.
-
-## Output Rules
-
-- The final commit message should still follow normal git commit style.
-- Format the message as a subject, one blank line, then flat bullets:
-  `<type>: <summary>`, blank line, then one or more contiguous `- detail`
-  lines.
-- Always keep exactly one blank line after the summary line and before the
-  first bullet.
-- Never include blank lines between individual bullet points.
-- Use enough bullets to summarize the actual change set; three bullets is
-  not a target or limit.
-- If the worktree contains obviously unrelated edits, say so briefly and
-  do not commit unless the user clearly wants the whole set committed.
-- Stage all untracked and unstaged worktree changes from the repo root
-  before committing unless the user explicitly asks for different staging
-  behavior or a repo-root `.codex` safety rule requires exclusion.
-- Exclude transient repo-root `.codex` artifacts from staging. The
-  `.codex` safety rule always applies even when committing all untracked
-  and unstaged files.
-- If `git add .` produces no staged changes, explain that there is
-  nothing to commit.
-- After a successful commit, push to `origin main`.
-- Do not use compound shell commands such as `git add && git commit`.
-- Run `git add`, `git commit`, and `git push` as separate CLI commands.
-
-## Execution Rules
-
-- Keep the subject specific and action-oriented.
-- Mention user-visible behavior or architectural intent, not file lists.
-- Keep bullets short and high signal, with no blank lines between them.
-- Before running `git commit`, inspect the final message and verify the
-  body is one contiguous bullet list with no empty line between bullets.
-- If there are no meaningful staged changes, do not invent a commit.
-- Do not leave behind transient repo-root `.codex` files after staging or
-  committing.
-- Do not leave untracked or unstaged files out of the commit unless the
-  user explicitly asked for partial staging or a repo-root `.codex`
-  safety rule requires exclusion.
-- After committing, push with `git push origin main`.
-- After the commit and push succeed, report the created commit hash and
-  subject briefly.
-- Do not use compound CLI commands joined with `&&`, `;`, or pipes.
-- Run `git add`, `git commit`, and `git push` individually so preapproved
-  command prefixes can apply without prompting.

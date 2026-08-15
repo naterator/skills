@@ -119,9 +119,16 @@ keeping the multiplan run in control of file creation.
 
 Commands:
 
+Use Fable as Claude's primary model and configure Opus 5 as its automatic
+fallback when Fable is overloaded or unavailable. Claude's single `--effort`
+setting applies to whichever model runs. Use `max` when the installed Claude
+CLI supports it; otherwise replace `--effort max` with `--effort xhigh`. Do not
+use an effort below `xhigh` for either Fable or Opus 5. The canonical command
+below uses `max` because the current Claude CLI supports it.
+
 ```bash
-claude --model fable --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob,LS -p "[PROMPTHERE]" > "plans/[PTC]-claude.md"
-grok --no-alt-screen --always-approve --effort high --model grok-4.5 -p "[PROMPTHERE]"
+claude --model fable --fallback-model claude-opus-5 --effort max --permission-mode dontAsk --allowedTools Read,Grep,Glob,LS -p "[PROMPTHERE]" > "plans/[PTC]-claude.md"
+grok --no-alt-screen --always-approve --effort high --model grok-4.6 -p "[PROMPTHERE]"
 ```
 
 Map commands to `name-id` values:

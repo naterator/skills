@@ -1,0 +1,4 @@
+interface:
+  display_name: "Find New Work"
+  short_description: "Audit repo for prioritized fixes and follow-ups"
+  default_prompt: "Use $find-new-work to audit this repository, update TODO.md with prioritized findings, and sync tests and docs."

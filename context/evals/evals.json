@@ -1,0 +1,137 @@
+{
+  "skill_name": "context",
+  "evals": [
+    {
+      "id": 1,
+      "expected_workdir": "initial",
+      "allowed_changes": "none",
+      "prompt": "Use {context_root} as the alternative Context root for this request. @context atlas",
+      "expected_output": "Inspect atlas and briefly orient the user without writing or changing the chat directory. Use the direct entrypoint fast path when catalogue and topic agree.",
+      "files": [],
+      "assertions": [
+        "Reads the root instructions/catalogue and atlas README and applicable instructions.",
+        "Does not change any saved files or the chat working directory.",
+        "Does not run complete discovery or load unrelated subjects when the topic is unambiguous."
+      ]
+    },
+    {
+      "id": 2,
+      "expected_workdir": "atlas",
+      "allowed_changes": "none",
+      "prompt": "Load @context atlas from {context_root} and continue work there. Do not make any project changes yet.",
+      "expected_output": "Read atlas orientation and recent changelog, verify its configured project directory, and adopt that directory without changing files.",
+      "files": [],
+      "assertions": [
+        "Reads atlas README, applicable instructions and recent CHANGELOG entries.",
+        "Verifies the configured atlas project directory with pwd using that workdir and adopts it for subsequent work.",
+        "Does not edit files, run stored diagnostics or scan unrelated subjects."
+      ]
+    },
+    {
+      "id": 3,
+      "expected_workdir": "initial",
+      "allowed_changes": "atlas-save",
+      "prompt": "Use {context_root} as the Context root. Save this verified finding under atlas: the offline parser accepts an empty input and returns an empty list. This was checked today in the fixture project. Do not switch this chat's working directory.",
+      "expected_output": "Resolve the existing save destination with complete discovery, save the finding in atlas README.md or notes.md with a linked changelog update, and preserve both the chat directory and atlas's saved directory.",
+      "files": [],
+      "assertions": [
+        "Performs complete destination discovery before saving and reuses atlas rather than creating a competing topic.",
+        "Saves only the supplied finding with appropriate provenance and updates atlas CHANGELOG with links.",
+        "Preserves the original chat directory and the existing saved atlas working-directory mapping.",
+        "Does not change unrelated subjects or claim to have independently executed the parser check."
+      ]
+    },
+    {
+      "id": 4,
+      "expected_workdir": "initial",
+      "allowed_changes": "none",
+      "prompt": "Load @context missing-project from {context_root} and get ready to work on its project.",
+      "expected_output": "Load available topic orientation, report that its configured directory is missing, preserve the current directory and ask for a replacement before project work.",
+      "files": [],
+      "assertions": [
+        "Reads available missing-project orientation and recent changelog.",
+        "Reports the unavailable configured directory and does not claim that a working-directory switch succeeded.",
+        "Asks for a replacement before project work; does not create or clone the project, change the saved mapping or edit context."
+      ]
+    },
+    {
+      "id": 5,
+      "expected_workdir": "context_root",
+      "allowed_changes": "none",
+      "prompt": "Load the Context collection itself from {context_root} and use that root as this chat's working directory.",
+      "expected_output": "Read root instructions and catalogue, verify and adopt the root, and stop after root-level orientation without loading all subjects or requiring a changelog.",
+      "files": [],
+      "assertions": [
+        "Reads root AGENTS.md and README.md and verifies the root with pwd using that workdir.",
+        "Adopts the requested root as the chat directory without editing files or saving a directory setting.",
+        "Does not load every subject, perform a full-tree topic search or require/create a root or subject changelog."
+      ]
+    },
+    {
+      "id": 6,
+      "expected_workdir": "initial",
+      "allowed_changes": "none",
+      "prompt": "Inspect the Context collection at {context_root} and tell me what the catalogue covers. Do not load it or switch directories.",
+      "expected_output": "Answer from root instructions/catalogue without changing the chat directory or loading individual projects.",
+      "files": [],
+      "assertions": [
+        "Reads the root instructions/catalogue and describes their scope.",
+        "Keeps the initial chat working directory and all saved files unchanged.",
+        "Does not treat inspection as a root-level load or open every project."
+      ]
+    },
+    {
+      "id": 7,
+      "expected_workdir": "initial",
+      "allowed_changes": "none",
+      "prompt": "Load @context hardware/absent from {context_root}.",
+      "expected_output": "Report the explicitly named missing entrypoint and do not silently substitute the existing hardware/atlas topic or create a topic.",
+      "files": [],
+      "assertions": [
+        "Checks the explicit hardware/absent target and reports that its entrypoint is missing.",
+        "Does not substitute hardware/atlas, create a directory or edit context.",
+        "Leaves the current chat working directory unchanged and does not claim a successful load."
+      ]
+    },
+    {
+      "id": 8,
+      "expected_workdir": "initial",
+      "allowed_changes": "none",
+      "prompt": "Use {context_root} as the Context root. Inspect the topic called radio; I am not sure whether that means the networking notes or the music notes.",
+      "expected_output": "Broaden read-only discovery and show the competing scopes, then ask which topic is intended without switching or writing.",
+      "files": [],
+      "assertions": [
+        "Broadens discovery beyond a single catalogue match and identifies both plausible radio scopes.",
+        "Explains the scope difference and asks the user to select before loading or writing.",
+        "Keeps saved files and the chat directory unchanged; does not use Git history as current topic evidence."
+      ]
+    },
+    {
+      "id": 9,
+      "expected_workdir": "initial",
+      "allowed_changes": "none",
+      "selected_root_suffix": "absent-collection",
+      "prompt": "Use {context_root}/absent-collection as the alternative Context root. Save this finding under atlas: the offline parser accepts empty input. Do not use any other collection.",
+      "expected_output": "Report that the selected root is unavailable and stop before choosing or writing a destination; do not fall back to live Context or create the collection.",
+      "files": [],
+      "assertions": [
+        "Checks the explicitly selected root and reports that it does not exist.",
+        "Does not read the live collection, silently use a different root or create the requested root.",
+        "Leaves the chat directory and all fixture files unchanged; does not claim the finding was saved."
+      ]
+    },
+    {
+      "id": 10,
+      "expected_workdir": "initial",
+      "allowed_changes": "none",
+      "prompt": "Use {context_root} as the Context root. Inspect the saved topic synthetic-wombat, if it exists.",
+      "expected_output": "Discover that this name appears only in infrastructure test examples, not a real saved topic. Explain that limitation without loading or creating it.",
+      "files": [],
+      "assertions": [
+        "Uses the selected root explicitly for discovery and distinguishes test-example matches from subject evidence.",
+        "Does not select .skills/example/evals as a canonical topic or treat synthetic-wombat as an established saved subject.",
+        "Leaves saved files and the chat directory unchanged and reports no verified topic entrypoint."
+      ]
+    }
+  ]
+}

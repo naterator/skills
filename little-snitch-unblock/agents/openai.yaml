@@ -1,0 +1,4 @@
+interface:
+  display_name: "Little Snitch Unblock"
+  short_description: "Unblock remote CLI connections with scoped rules"
+  default_prompt: "Use $little-snitch-unblock to diagnose the stalled command and allow its identified Little Snitch connection."

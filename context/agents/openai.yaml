@@ -1,0 +1,5 @@
+# Optional Codex UI metadata; not an OpenCode agent/configuration definition.
+interface:
+  display_name: "context"
+  short_description: "Query, load, save, and manage durable topic context"
+  default_prompt: "Use $context to help with the saved topic or context question described in this request."

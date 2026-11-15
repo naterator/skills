@@ -1,0 +1,51 @@
+{
+  "skill_name": "git-repo-and-gitea-storage-reduce",
+  "evals": [
+    {
+      "id": 1,
+      "name": "audit-only-mixed-build-inputs",
+      "prompt": "OFFLINE TABLETOP ONLY: no tools against any live repo or host. My game's Build folder is 12 GiB and .git is 1.6 GiB. Build has the newest signed iOS/Mac/TV archives, dSYMs, exports, PCM masters, ResourceSeeds including nested rollback material, old pilots, traces, Python caches and a venv. Assets has raw music and encrypted shipping resources. Tell me what can go and what you would inspect. I have not approved deleting anything or rewriting history. Produce a concise audit plan with a keep/remove/review table, and state what you will not do yet.",
+      "expected_output": "Audits without mutations; protects current releases, source/authoring assets, masters, seeds and signing material; proposes selective candidates rather than wiping Build or Assets; distinguishes current blobs, historical versions, recovery objects and refs; asks for scoped approval.",
+      "files": [],
+      "expectations": [
+        "Keeps this audit read-only and seeks scoped approval before deletion or history/server mutations.",
+        "Protects latest signed platform archives, dSYMs, exports, final captures and provenance.",
+        "Protects PCM masters, raw authoring/shipping assets, nested resource seeds/material/rollback data and signing inputs.",
+        "Offers selective removal candidates with diagnostic/reproducibility tradeoffs rather than deleting broad Build or Assets parents.",
+        "Separates current HEAD blobs, historical versions, other refs/reflogs and unreachable recovery data.",
+        "Accounts for deduplication confidence and allocated/logical or backup-cost differences without promising exact savings."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "approved-signed-rewrite-and-ref-cleanup",
+      "prompt": "OFFLINE TABLETOP ONLY: no real cleanup or signing. I approved removing only reviewed obsolete binary blob IDs absent from current HEAD and rewriting main, re-signing every rewritten commit with my configured GPG key, and an explicit force-with-lease push. I have a dirty owner file, an unknown stash, an old auxiliary tree checkpoint, and a remote-tracking ref still on old history. Explain the execution gates and full local sequence, including recovery backup, signatures, refs/reflogs, physical object cleanup and a fresh clone. Do not assume approval to delete my stash/checkpoint or discard dirty work.",
+      "expected_output": "Stops at dirty/unapproved recovery work instead of executing; provides a verified external backup, exact blob plan and current-tree invariants; preserves/refines ref scope; re-signs and verifies all rewritten commits; uses explicit old-OID lease; then clears approved local roots/reflogs and GCs; verifies fresh clone and backup cost.",
+      "files": [],
+      "expectations": [
+        "Stops execution for dirty owner work and unknown recovery refs; no automatic reset, stash, or blanket deletion.",
+        "Requires a verified independent external recovery backup and explains retained backup/recovery cost.",
+        "Uses reviewed obsolete blob IDs, protects current inputs/tree, and preserves commit metadata and parent relationships.",
+        "Freshly re-signs every rewritten commit with the configured GPG key and verifies every signature without fallback.",
+        "Uses an observed-old-OID force-with-lease and refuses to overwrite concurrent remote work.",
+        "Completes approved local ref/tracking/reflog cleanup and physical GC, then verifies integrity and a fresh clone.",
+        "Any unreachable-only reflog expiry explicitly preserves reachable entries with --expire=never and names only approved logs; stronger all-log expiry is gated separately."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "gitea-timeout-then-scoped-prune-and-refresh",
+      "prompt": "SYNTHETIC OFFLINE TABLETOP ONLY: no network, SSH, kubectl or live commands. The rewrite is verified, but Gitea reports a large repository while a fresh clone is much smaller. I explicitly approved built-in all-repository GC first, then pruning only example-org/example-game.git, and another built-in GC if needed to refresh the counter. The first GC POST timed out at 45 seconds, but exec_times rose from 0 to 1. The hypothetical authorized route is SSH to admin-host.example.org and sudo to an installed k3s kubectl command. Give the complete safe server sequence and success evidence. Discover the pod name, binary location, repository ROOT and actual service UID rather than assuming them.",
+      "expected_output": "Does not retry an ambiguous POST blindly or claim global completion from its counter; discovers actual server pod, container and allowlisted ROOT; verifies service user/path/tip/refs/writers/locks; expires scoped server reflogs and prunes that repo; verifies disk/objects/fsck; runs the authorized final built-in refresh with longer timeout and reads API size; does not edit SQL or transfer private keys.",
+      "files": [],
+      "expectations": [
+        "Treats the timed-out POST as ambiguous, avoids immediate duplicate submission, and does not equate counter increment with complete success.",
+        "Dynamically discovers the actual Gitea pod/container and allowlisted repository ROOT through the supplied administration-host/k3s route.",
+        "Verifies service-user ownership, exact repository/tip/refs, active writers/locks and a quiet window before scoped pruning.",
+        "Expires authorized server reflogs and runs prune-now only for the verified named bare repository.",
+        "Verifies unchanged signed graph/refs, strict fsck, absent obsolete objects and actual disk/pack size after pruning.",
+        "Runs the authorized final built-in GC with a longer timeout, reads back Gitea size, and avoids SQL edits, fake pushes and private-key transfer."
+      ]
+    }
+  ]
+}

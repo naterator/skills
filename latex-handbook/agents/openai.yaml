@@ -1,0 +1,4 @@
+interface:
+  display_name: "LaTeX Handbook"
+  short_description: "Latin Modern documents in a compact handbook style"
+  default_prompt: "Use $latex-handbook to turn this content into a compact PDF using the bundled handbook template."

@@ -1,0 +1,359 @@
+#!/usr/bin/python3
+"""Add a scoped outbound Little Snitch allow rule without desktop control."""
+
+import argparse
+import collections
+import copy
+import ctypes
+import datetime
+import fcntl
+import ipaddress
+import json
+import os
+from pathlib import Path
+import plistlib
+import pwd
+import re
+import shlex
+import subprocess
+import sys
+import tempfile
+
+CLI = "/Applications/Little Snitch.app/Contents/Components/littlesnitch"
+BACKUPS = Path.home() / "Library/Application Support/little-snitch-allow/backups"
+# Observed importer losses: these old values are no longer accepted by
+# write-preference. Do not silently authorize even these known losses.
+LEGACY_GLOBAL = {"monitorMaxConnectionsInModel"}
+LEGACY_USER = {"GeoViewMyLocationLatitude", "GeoViewMyLocationLongitude"}
+VOLATILE_MODEL = {"blocklistStatistics", "lastSeenExecutableByCodeIdentifier"}
+
+
+class Failure(RuntimeError):
+    pass
+
+
+def invoke(user, *args):
+    prefix = [] if os.geteuid() == 0 else ["/usr/bin/sudo"]
+    result = subprocess.run(
+        prefix + [CLI, "--user", user, *args], capture_output=True, text=True, timeout=30
+    )
+    if result.returncode:
+        raise Failure((result.stderr or result.stdout).strip() or
+                      "Little Snitch command failed: " + args[0])
+    return result.stdout
+
+
+def export_model(user):
+    model = json.loads(invoke(user, "export-model"))
+    if not isinstance(model, dict) or not isinstance(model.get("rules"), list):
+        raise Failure("Little Snitch returned an unsupported model format")
+    return model
+
+
+def canonical_rule(rule):
+    """Normalize documented defaults and observed export normalization only."""
+    value = copy.deepcopy(rule)
+    for key in ("lastUsed", "useCount"):
+        value.pop(key, None)
+    for key, default in (("direction", "outgoing"), ("approved", True),
+                         ("disabled", False), ("priority", "regular")):
+        if value.get(key, default) == default:
+            value.pop(key, None)
+    # An importer may change only the host list's scalar/list representation.
+    for key in ("remote-hosts", "remote-domains"):
+        if key in value:
+            hosts = value[key]
+            value[key] = sorted(hosts if isinstance(hosts, list) else [hosts])
+    return value
+
+
+def encoded(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def configuration(model):
+    value = copy.deepcopy(model)
+    for key in VOLATILE_MODEL:
+        value.pop(key, None)
+    value["rules"] = sorted(encoded(canonical_rule(r)) for r in value["rules"])
+    return value
+
+
+def legacy_entries(model):
+    entries = []
+    for key in LEGACY_GLOBAL:
+        if key in model.get("globalDefaults", {}):
+            entries.append(("globalDefaults", None, key))
+    for index, user in enumerate(model.get("users", [])):
+        for key in LEGACY_USER:
+            if key in user.get("defaults", {}):
+                entries.append(("users", index, key))
+    return entries
+
+
+def clean_legacy(model, entries):
+    value = copy.deepcopy(model)
+    for section, index, key in entries:
+        if section == "globalDefaults":
+            value[section].pop(key)
+        else:
+            value[section][index]["defaults"].pop(key)
+    return value
+
+
+def identity(text):
+    if text.startswith("identifier."):
+        if not re.fullmatch(r"identifier\.[A-Za-z0-9]+/[A-Za-z0-9_.-]+", text):
+            raise argparse.ArgumentTypeError("Invalid Little Snitch Code ID")
+        return text
+    # Patterns are explicit LS identities; shell globs must be quoted.
+    if text.startswith("path."):
+        path = text[5:]
+        if not path or path.startswith("/") or ".." in path.split("/") or any(
+            c in text for c in "\n\r\0"
+        ) or "*" not in path:
+            raise argparse.ArgumentTypeError("Use path.relative/segments/*/executable for a pattern")
+        # Never accept a pattern for every process or an entire binary folder.
+        if path.startswith("*") or any(c in path.split("/")[-1] for c in "*?["):
+            raise argparse.ArgumentTypeError("A process pattern must name a specific executable")
+        return text
+    path = Path(text).expanduser()
+    if not path.is_absolute():
+        raise argparse.ArgumentTypeError("Process must be an absolute executable path or Code ID")
+    try:
+        path = path.resolve(strict=True)
+    except OSError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise argparse.ArgumentTypeError("Process must name an executable file, not an app bundle")
+    return str(path)
+
+
+def hostname(text):
+    try:
+        value = text.rstrip(".").encode("idna").decode("ascii").lower()
+    except UnicodeError as exc:
+        raise argparse.ArgumentTypeError("Invalid hostname") from exc
+    if len(value) > 253 or "." not in value or any(
+        not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", part)
+        for part in value.split(".")
+    ):
+        raise argparse.ArgumentTypeError("Give a hostname/domain, without URL, port, or wildcard")
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return value
+    raise argparse.ArgumentTypeError("Use --address for a literal IP address")
+
+
+def address(text):
+    try:
+        return str(ipaddress.ip_address(text))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("Give one IPv4 or IPv6 address") from exc
+
+
+def port(text):
+    if not text.isdecimal() or not 1 <= int(text) <= 65535:
+        raise argparse.ArgumentTypeError("Port must be 1 through 65535")
+    return str(int(text))
+
+
+def make_rule(args, uid):
+    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    result = {"action": "allow", "origin": "unknown", "uid": uid,
+              "process": args.process, "protocol": args.protocol,
+              "ports": args.port, "creationDate": now, "modificationDate": now}
+    if args.via:
+        result["via"] = args.via
+    if args.host:
+        result["remote-hosts"] = args.host
+    elif args.domain:
+        result["remote-domains"] = args.domain
+    else:
+        result["remote-addresses"] = args.address
+    if args.note:
+        result["notes"] = args.note
+    return result
+
+
+def matching_rule(model, wanted):
+    """Exact effective scope only: a disabled/profile/group rule is not a match."""
+    excluded = {"creationDate", "modificationDate", "origin", "notes", "factoryHelpText"}
+    wanted = {k: v for k, v in canonical_rule(wanted).items() if k not in excluded}
+    for candidate in model["rules"]:
+        candidate = {k: v for k, v in canonical_rule(candidate).items() if k not in excluded}
+        if candidate == wanted:
+            return True
+    return False
+
+
+def save_private(folder, name, model):
+    path = folder / name
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as stream:
+        json.dump(model, stream, indent=2)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    return path
+
+
+def apply_rule(user, rule, allow_legacy=False, backup_root=BACKUPS):
+    before = export_model(user)
+    print("Requested permanent outbound exception:")
+    print(json.dumps(rule, indent=2))
+    if matching_rule(before, rule):
+        print("An identical active exception already exists; no configuration was changed.")
+        return None
+    entries = legacy_entries(before)
+    if entries and not allow_legacy:
+        raise Failure("Importer would discard legacy preference entries: " + str(entries) +
+                      ". Review them; use --allow-legacy-cleanup only if you accept their removal.")
+    expected = clean_legacy(before, entries)
+    expected["rules"].append(rule)
+    if entries:
+        print("Explicitly authorized legacy cleanup:", entries)
+    backup_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    folder = Path(tempfile.mkdtemp(prefix="change-", dir=str(backup_root)))
+    backup = save_private(folder, "before.json", before)
+    requested = save_private(folder, "requested.json", expected)
+    print("Backup:", backup, flush=True)
+    print("Manual recovery (replaces the complete configuration):")
+    print(shlex.join(["sudo", CLI, "--user", user, "restore-model",
+                      "--preserve-terminal-access", str(backup)]), flush=True)
+    # Another GUI/CLI may edit while we build the backup. Never knowingly
+    # overwrite that edit; our lock only serializes instances of this script.
+    if configuration(export_model(user)) != configuration(before):
+        raise Failure("Configuration changed before import; nothing was imported. Rerun with a fresh preview.")
+    try:
+        invoke(user, "restore-model", "--preserve-terminal-access", str(requested))
+        after = export_model(user)
+        save_private(folder, "after.json", after)
+    except (Failure, subprocess.TimeoutExpired, OSError, ValueError) as exc:
+        raise Failure("Import/readback failed; configuration state is uncertain. "
+                      "Inspect the backup and live state before retrying. " + str(exc)) from exc
+    if configuration(expected) != configuration(after):
+        old_rules = collections.Counter(encoded(canonical_rule(r)) for r in before["rules"])
+        new_rules = collections.Counter(encoded(canonical_rule(r)) for r in after["rules"])
+        raise Failure("POST-IMPORT VERIFICATION FAILED. Missing/changed existing rules: " +
+                      str(sum((old_rules - new_rules).values())) +
+                      ". Inspect before.json, requested.json, and after.json in " + str(folder) +
+                      ". No automatic full restore was attempted because it could overwrite concurrent edits.")
+    if not matching_rule(after, rule):
+        raise Failure("The requested active exception did not survive import; inspect " + str(folder))
+    print("Verified: one exception added; existing rules and settings preserved" +
+          (" except the explicitly accepted legacy cleanup." if entries else "."))
+    print("Retry/check the original command; a saved rule alone does not prove it completed.")
+    return folder
+
+
+def alerts():
+    """Read window metadata; never capture pixels, send input, or start CUA."""
+    cg = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+    cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+    cg.CGWindowListCopyWindowInfo.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    cg.CGWindowListCopyWindowInfo.restype = ctypes.c_void_p
+    cf.CFPropertyListCreateData.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
+                                          ctypes.c_long, ctypes.c_ulong, ctypes.c_void_p]
+    cf.CFPropertyListCreateData.restype = ctypes.c_void_p
+    cf.CFDataGetLength.argtypes = [ctypes.c_void_p]
+    cf.CFDataGetLength.restype = ctypes.c_long
+    cf.CFDataGetBytePtr.argtypes = [ctypes.c_void_p]
+    cf.CFDataGetBytePtr.restype = ctypes.c_void_p
+    cf.CFRelease.argtypes = [ctypes.c_void_p]
+    window_list = cg.CGWindowListCopyWindowInfo(0, 0)
+    if not window_list:
+        raise Failure("Window metadata unavailable in this session")
+    data = None
+    try:
+        data = cf.CFPropertyListCreateData(None, window_list, 200, 0, None)
+        if not data:
+            raise Failure("Could not decode window metadata")
+        windows = plistlib.loads(ctypes.string_at(cf.CFDataGetBytePtr(data), cf.CFDataGetLength(data)))
+        found = [w.get("kCGWindowName", "") for w in windows
+                 if "Little Snitch" in w.get("kCGWindowOwnerName", "")]
+        titles = [title for title in found if "Connection alert:" in title]
+        for title in titles:
+            print(title)
+        if not titles:
+            print("No readable Little Snitch connection-alert title. This does not prove there is no prompt; "
+                  "macOS may hide window metadata from this remote session.")
+    finally:
+        if data:
+            cf.CFRelease(data)
+        cf.CFRelease(window_list)
+
+
+def parser():
+    result = argparse.ArgumentParser(
+        description=__doc__,
+        epilog="Example: little-snitch-allow --process /opt/homebrew/bin/node "
+               "--host registry.npmjs.org --apply. Rules persist until removed in Little Snitch.")
+    result.add_argument("--alerts", action="store_true", help="Read connection-alert window titles; no desktop control")
+    result.add_argument("--user", help="Rule owner; defaults to sudo's invoking user")
+    result.add_argument("--process", type=identity, help="Executable, Code ID, or quoted LS path.* pattern")
+    result.add_argument("--via", type=identity, help="Helper executable when the alert says parent app via helper")
+    remote = result.add_mutually_exclusive_group()
+    remote.add_argument("--host", type=hostname, help="One exact hostname (preferred)")
+    remote.add_argument("--domain", type=hostname, help="Domain and all its subdomains")
+    remote.add_argument("--address", type=address, help="One IPv4/IPv6 address")
+    result.add_argument("--port", type=port, default="443")
+    result.add_argument("--protocol", choices=("tcp", "udp"), default="tcp")
+    result.add_argument("--note", help="Optional rule annotation")
+    result.add_argument("--apply", action="store_true", help="Apply; otherwise only preview")
+    result.add_argument("--allow-legacy-cleanup", action="store_true",
+                        help="Accept removal of the three known obsolete preference keys; preview lists them")
+    return result
+
+
+def main(argv=None):
+    args = parser().parse_args(argv)
+    if sys.platform != "darwin":
+        raise Failure("This command requires macOS and Little Snitch")
+    if args.alerts:
+        if args.apply or args.process or args.via or args.host or args.domain or args.address:
+            raise Failure("--alerts is read-only and cannot be combined with rule arguments")
+        alerts()
+        return 0
+    if not args.process or not (args.host or args.domain or args.address):
+        raise Failure("Specify --process and one of --host, --domain, or --address; see --help")
+    user = args.user or os.environ.get("SUDO_USER") or pwd.getpwuid(os.getuid()).pw_name
+    try:
+        account = pwd.getpwnam(user)
+    except KeyError as exc:
+        raise Failure("Unknown local user: " + user) from exc
+    if account.pw_uid < 500:
+        raise Failure("Specify a normal user with --user; system-wide exceptions are outside this tool's scope")
+    rule = make_rule(args, account.pw_uid)
+    if not args.apply:
+        model = export_model(user)
+        print("Preview only; no configuration changed:")
+        print(json.dumps(rule, indent=2))
+        print("Identical active exception already exists:", matching_rule(model, rule))
+        print("Known importer legacy losses:", legacy_entries(model))
+        print("Apply with the same arguments plus --apply.")
+        return 0
+    BACKUPS.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd = os.open(str(BACKUPS.parent / ".apply.lock"), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise Failure("Another little-snitch-allow instance is applying a change") from exc
+        apply_rule(user, rule, args.allow_legacy_cleanup)
+    finally:
+        os.close(fd)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (Failure, OSError, ValueError, subprocess.TimeoutExpired) as error:
+        print("ERROR:", error, file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("Interrupted. If import started, inspect the printed backup and live configuration before retrying.",
+              file=sys.stderr)
+        sys.exit(130)

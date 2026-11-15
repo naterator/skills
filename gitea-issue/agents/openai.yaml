@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gitea Issue"
+  short_description: "Read and manage Gitea issues from tea"
+  default_prompt: "Use $gitea-issue to list open issues or pull an issue into the workspace."

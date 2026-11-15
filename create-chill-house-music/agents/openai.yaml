@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Chill House Music"
+  short_description: "Compose and produce relaxed, groove-led house music"
+  default_prompt: "Use $create-chill-house-music to produce original chill-house music from my references and refine it from listening feedback."

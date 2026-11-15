@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plan Title Create"
+  short_description: "Create concise hyphenated plan titles"
+  default_prompt: "Use $plan-title-create to title this implementation plan."

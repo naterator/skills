@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+"""Lock this user's Mac console once from its GUI session, then verify it."""
+import argparse
+import ctypes
+import datetime
+import json
+import os
+from pathlib import Path
+import plistlib
+import re
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+
+LOGIN = '/System/Library/PrivateFrameworks/login.framework/login'
+SECURITY = '/System/Library/Frameworks/Security.framework/Security'
+LAUNCHCTL = '/bin/launchctl'
+
+
+class LockError(RuntimeError):
+    pass
+
+
+def console_owner():
+    uid = os.getuid()
+    if uid == 0 or os.stat('/dev/console').st_uid != uid:
+        raise LockError('Run as the active console user, without sudo; no lock requested.')
+    return uid
+
+
+def session_info():
+    api = ctypes.CDLL(SECURITY)
+    api.SessionGetInfo.argtypes = [ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32),
+                                   ctypes.POINTER(ctypes.c_uint32)]
+    api.SessionGetInfo.restype = ctypes.c_int32
+    session, flags = ctypes.c_uint32(), ctypes.c_uint32()
+    status = api.SessionGetInfo(0xffffffff, ctypes.byref(session), ctypes.byref(flags))
+    if status != 0:
+        raise LockError(f'Cannot inspect the security session (code {status}); no lock requested.')
+    return {'id': session.value, 'graphics': bool(flags.value & 0x10),
+            'remote': bool(flags.value & 0x1000)}
+
+
+def native_lock_function():
+    library = ctypes.CDLL(LOGIN)
+    function = library.SACLockScreenImmediate
+    function.argtypes = []
+    # Interpret the private ABI's reply as 32 bits. This is not a documented
+    # OSStatus/errno contract; compatibility must be verified on the target OS.
+    function.restype = ctypes.c_int32
+    return function
+
+
+def lock_flag(data):
+    roots = data if isinstance(data, list) else [data]
+    values = [root['IOConsoleLocked'] for root in roots
+              if isinstance(root, dict) and 'IOConsoleLocked' in root]
+    return values[0] if len(values) == 1 and type(values[0]) is bool else None
+
+
+def read_state():
+    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        result = subprocess.run(['/usr/sbin/ioreg', '-n', 'Root', '-d1', '-a'],
+                                capture_output=True, timeout=3, check=True)
+        return {'time': timestamp, 'locked': lock_flag(plistlib.loads(result.stdout))}
+    except (OSError, subprocess.SubprocessError, ValueError, plistlib.InvalidFileException) as error:
+        return {'time': timestamp, 'locked': None, 'error': type(error).__name__}
+
+
+def summarize(samples):
+    flags = [sample['locked'] for sample in samples]
+    if flags and all(flag is True for flag in flags):
+        return 'locked', 0
+    if flags and flags[-1] is False:
+        return 'unlocked', 1
+    return 'unverified', 2
+
+
+def verify():
+    samples = []
+    for index in range(3):
+        if index:
+            time.sleep(1)
+        samples.append(read_state())
+    state, status = summarize(samples)
+    print(json.dumps({'state': state, 'source': 'IOConsoleLocked',
+                      'temporary_lock_observed': any(s['locked'] is True for s in samples)
+                          and state != 'locked', 'samples': samples}))
+    return status
+
+
+def private_json(path, value):
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, 'w') as stream:
+        json.dump(value, stream)
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def private_read(path):
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_mode & 0o077 or info.st_size > 131072):
+            raise LockError('Invalid private job receipt; no retry made.')
+        return json.loads(stream.read(131073))
+
+
+def gui_child(folder):
+    import contextlib
+    import io
+    console_owner()
+    info = folder.lstat()
+    if (not folder.is_dir() or folder.is_symlink() or info.st_uid != os.getuid()
+            or info.st_mode & 0o077 or folder.resolve() != folder):
+        raise LockError('Invalid private job directory; no lock requested.')
+    request = private_read(folder / 'request.json')
+    if request.get('operation') not in ('lock', 'diagnose') or not re.fullmatch(r'[0-9a-f]{32}', request.get('id', '')):
+        raise LockError('Invalid GUI job request; no lock requested.')
+    receipt = {'id': request['id'], 'operation': request['operation'], 'pid': os.getpid()}
+    output = io.StringIO()
+    try:
+        if request['operation'] == 'diagnose':
+            receipt['probe'] = gui_probe()  # Symbol resolution only, no lock call.
+            receipt['exit_status'] = 0 if receipt['probe']['gui_context_ready'] else 2
+        else:
+            with contextlib.redirect_stdout(output):
+                receipt['exit_status'] = request_once()
+    except (LockError, OSError, AttributeError) as error:
+        receipt.update(exit_status=2, error=str(error) if isinstance(error, LockError)
+                       else 'GUI lock helper failed; lock state unverified.')
+    receipt['output'] = output.getvalue()
+    temporary = folder / 'result.tmp'
+    private_json(temporary, receipt)
+    os.replace(temporary, folder / 'result.json')
+    return receipt['exit_status']
+
+
+def cleanup_job(target, folder, child_pid):
+    # Only this UUID-named job is stopped. No loginwindow/WindowServer signals.
+    handlers = {s: signal.signal(s, signal.SIG_IGN)
+                for s in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)}
+    try:
+        before = subprocess.run([LAUNCHCTL, 'print', target], capture_output=True,
+                                text=True, timeout=5)
+        if child_pid is None and before.returncode == 0:
+            match = re.search(r'^\s*pid = ([0-9]+)\s*$', before.stdout, re.MULTILINE)
+            child_pid = int(match[1]) if match else None
+        subprocess.run([LAUNCHCTL, 'bootout', target], capture_output=True, timeout=5)
+        absent = subprocess.run([LAUNCHCTL, 'print', target], capture_output=True, timeout=5)
+        if absent.returncode != 113:
+            raise LockError(f'Could not verify removal of owned job {target}; evidence retained at {folder}.')
+        if child_pid is not None:
+            until = time.monotonic() + 3
+            while True:
+                try:
+                    os.kill(child_pid, 0)  # Existence check only, never a signal.
+                except ProcessLookupError:
+                    break
+                if time.monotonic() >= until:
+                    raise LockError(f'Owned job was removed but process exit is unverified; evidence retained at {folder}.')
+                time.sleep(0.1)
+        elif before.returncode == 0:
+            # No recorded child means this attempt cannot establish its exit.
+            raise LockError(f'Owned job was removed; child identity is unknown. Evidence retained at {folder}.')
+        shutil.rmtree(folder)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise LockError(f'Cleanup of owned job {target} is unverified; evidence retained at {folder}.') from error
+    finally:
+        for signum, handler in handlers.items():
+            signal.signal(signum, handler)
+
+
+def run_gui_job(operation):
+    uid = console_owner()
+    request_id = uuid.uuid4().hex
+    label = 'local.screen-lock.' + request_id
+    target = f'gui/{uid}/{label}'
+    folder = Path(tempfile.mkdtemp(prefix='screen-lock-')).resolve()
+    child_pid = None
+    receipt = None
+    try:
+        private_json(folder / 'request.json', {'id': request_id, 'operation': operation})
+        for name in ('stdout', 'stderr'):
+            descriptor = os.open(folder / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            os.close(descriptor)
+        configuration = {'Label': label, 'ProgramArguments': [sys.executable,
+            str(Path(__file__).resolve()), '--gui-job', str(folder)],
+            'RunAtLoad': True, 'KeepAlive': False, 'LimitLoadToSessionType': 'Aqua',
+            'ExitTimeOut': 2, 'StandardOutPath': str(folder / 'stdout'),
+            'StandardErrorPath': str(folder / 'stderr')}
+        job = folder / 'job.plist'
+        descriptor = os.open(job, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, 'wb') as stream:
+            plistlib.dump(configuration, stream)
+        result = subprocess.run([LAUNCHCTL, 'bootstrap', f'gui/{uid}', str(job)],
+                                capture_output=True, timeout=5)
+        if result.returncode:
+            raise LockError(f'Cannot start the one-shot GUI job (launchctl code {result.returncode}); no retry made.')
+        until = time.monotonic() + 20
+        while not (folder / 'result.json').exists():
+            if time.monotonic() >= until:
+                raise LockError('GUI job timed out; lock state unverified. No retry made.')
+            time.sleep(0.1)
+        receipt = private_read(folder / 'result.json')
+        if (receipt.get('id') != request_id or receipt.get('operation') != operation
+                or type(receipt.get('exit_status')) is not int or receipt['exit_status'] not in (0, 1, 2)
+                or type(receipt.get('pid')) is not int or receipt['pid'] <= 1):
+            raise LockError('Invalid GUI job result; lock state unverified. No retry made.')
+        child_pid = receipt['pid']
+    finally:
+        cleanup_job(target, folder, child_pid)
+    receipt['job_cleanup_verified'] = True
+    return receipt
+
+
+def gui_probe():
+    console_owner()
+    session = session_info()
+    native_lock_function()  # Resolve only. Never call it in a diagnostic.
+    return {'session': session, 'native_api_available': True,
+            'gui_context_ready': session['graphics'], 'lock_requested': False}
+
+
+def request_once():
+    console_owner()
+    if not session_info()['graphics']:
+        raise LockError('The one-shot job has no GUI security session; no lock requested.')
+    result = native_lock_function()()
+    if result != 0:
+        print(json.dumps({'state': 'unverified', 'native_api_code': result,
+                          'error': 'Native lock request failed; no retry made.'}))
+        return 2
+    print('Native GUI-session lock request accepted; verifying console state.', flush=True)
+    return verify()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, epilog=
+        'Verifier status: 0 locked, 1 unlocked, 2 unverified. No automatic retry. '
+        'A successful diagnostic does not prove that a lock will persist.')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--check', action='store_true', help='read lock state only')
+    modes.add_argument('--diagnose', action='store_true', help='probe GUI routing without locking')
+    modes.add_argument('--gui-job', type=Path, help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    if sys.platform != 'darwin':
+        raise LockError('screen-lock requires macOS; no lock requested.')
+    if args.check:
+        return verify()
+    if args.gui_job is not None:
+        return gui_child(args.gui_job)
+    if args.diagnose:
+        before = session_info()
+        receipt = run_gui_job('diagnose')
+        print(json.dumps({'current_session': before, 'gui_probe': receipt.get('probe'),
+                          'job_cleanup_verified': receipt['job_cleanup_verified'],
+                          'lock_requested': False, 'error': receipt.get('error')}))
+        return receipt['exit_status']
+    receipt = run_gui_job('lock')
+    if receipt.get('output'):
+        print(receipt['output'], end='')
+    if receipt.get('error'):
+        print(receipt['error'], file=sys.stderr)
+    return receipt['exit_status']
+
+
+if __name__ == '__main__':
+    sys.dont_write_bytecode = True
+    try:
+        for signum in (signal.SIGTERM, signal.SIGHUP):
+            signal.signal(signum, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        print('Cancelled; no retry made.', file=sys.stderr)
+        raise SystemExit(130)
+    except (LockError, OSError, AttributeError, ImportError, ValueError, TypeError,
+            ctypes.ArgumentError, subprocess.SubprocessError) as error:
+        print(str(error) if isinstance(error, LockError) else
+              'Screen lock helper unavailable or failed; lock state unverified. No retry made.',
+              file=sys.stderr)
+        raise SystemExit(2)

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Leeloo Dallas Multiplan"
+  short_description: "Coordinate multiple LLM planning passes"
+  default_prompt: "Use $leeloo-dallas-multiplan to create a multi-model master plan for the next feature."

@@ -1,0 +1,41 @@
+# Public template: put personal family defaults in your private installed copy.
+# Grades apply only to the stated school year; do not advance automatically.
+family:
+  school:
+    name: null
+    abbreviation: null
+    campus: null
+    city: null
+    state: null
+    country: null
+    timezone: null
+  # Each private student entry needs name, grade, and school_year.
+  students: []
+  profile_refresh: "Use clear newer school documents or user corrections. Ask when uncertainty affects the analysis; never assume old grade levels remain current indefinitely."
+
+reporting:
+  default_scope: "comprehensive"
+  focused_requests: "Answer only the requested question or timeline while preserving evidence, uncertainty, dates, and confidence standards."
+  briefing_template: "references/briefing-template.md"
+  emphasis:
+    - "Academic development and documented curriculum progression"
+    - "Upcoming tests and specific study priorities"
+    - "Assignment expectations, rubrics, and deadlines"
+    - "Meaningful parent responsibilities and schedule/procedure changes"
+    - "Supported new information, changes, and contradictions"
+  style: "Detailed, clear, practical, professional but approachable, with minimal repetition."
+  first_substantive_section: "Executive Summary"
+  change_labels: ["New", "Updated", "Continuing", "Reminder"]
+  missing_history: "State that historical change detection is limited; do not call an announcement new merely because it appears in the current batch."
+  timeline_columns: ["Date / day / time", "Event", "Child / audience", "Preparation / action", "Status"]
+  action_groups: ["Urgent", "This Week", "Upcoming"]
+  practice_labels: ["Required homework", "Optional school-provided practice", "Suggested home practice"]
+  confidence_levels: ["High", "Moderate", "Weak"]
+  citations: "Cite consequential factual claims and conflicts with the exact source and page/section; never fabricate citations."
+  final_priorities: "Conclude full briefings with 3–5 highest-value priorities, or fewer if fewer are supported."
+
+content_exclusions:
+  # Apply to every user-visible report component. Never announce exclusions.
+  explicit_request_override: true
+  scope_rule: "Exclude only the listed topic, not unrelated academic or operational content sharing its document."
+  topics: []

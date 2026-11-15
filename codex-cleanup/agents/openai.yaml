@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Cleanup"
+  short_description: "Reclaim Codex space while preserving analysis"
+  default_prompt: "Use $codex-cleanup to audit Codex storage and reclaim space while preserving history, current and archived analysis, and usage statistics."

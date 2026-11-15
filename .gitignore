@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.site-backups/
+.env
+.env.*
+!.env.example
+*.local.json
+*.local.yaml
+*.local.yml
+*.age

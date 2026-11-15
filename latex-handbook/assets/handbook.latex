@@ -1,0 +1,64 @@
+\documentclass[10pt,letterpaper]{article}
+\usepackage[margin=0.65in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \errmessage{This template requires XeLaTeX or Tectonic}
+\else
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\usepackage{xcolor}
+\usepackage{longtable,booktabs,array,calc,etoolbox}
+\usepackage{graphicx}
+\usepackage{fancyvrb}
+\usepackage{xurl}
+\usepackage{hyperref}
+\hypersetup{hidelinks,unicode=true,
+  pdftitle={$title$},
+  pdfauthor={$for(author)$$author$$sep$; $endfor$},
+  pdfcreator={LaTeX via Pandoc}}
+\urlstyle{same}
+\setlength{\emergencystretch}{3em}
+\pagestyle{plain}
+\setlength{\footskip}{30pt}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\providecommand{\passthrough}[1]{#1}
+\providecommand{\pandocbounded}[1]{#1}
+\makeatletter
+\def\LTcaptype{none}
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+$if(highlighting-macros)$
+$highlighting-macros$
+$endif$
+$if(numbersections)$
+\setcounter{secnumdepth}{3}
+$else$
+\setcounter{secnumdepth}{-\maxdimen}
+$endif$
+$for(header-includes)$
+$header-includes$
+$endfor$
+$if(title)$
+\title{$title$}
+$endif$
+\author{$for(author)$$author$$sep$ \and $endfor$}
+\date{$date$}
+\begin{document}
+$if(title)$
+\maketitle
+$endif$
+$if(toc)$
+\setcounter{tocdepth}{$toc-depth$}
+\tableofcontents
+$endif$
+$body$
+\end{document}

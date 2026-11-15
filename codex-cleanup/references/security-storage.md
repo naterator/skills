@@ -1,0 +1,11 @@
+# Security scan storage is a separate scope
+
+Only read this when the user specifically requests Security scan-history removal. Do not include it in history-preserving disk cleanup. Recheck current official support and the installed plugin schema; this is an observed layout, not a permanent API.
+
+The desktop's Local Security workbench has used `$CODEX_HOME/state/plugins/codex-security/workbench.sqlite3`, overridden by `CODEX_SECURITY_STATE_DIR`. The [official CLI reference](https://learn.chatgpt.com/docs/security/cli/reference) documents this storage root. This differs from cloud security scans and account conversation history. Check the host selected in the GUI before drawing conclusions.
+
+In plugin 0.1.31, `scans.id` identified each UUID. `scan_dir` pointed to JSON/Markdown artifacts; directories could already be missing while database-backed GUI entries remained. `status=failed` plus a non-null `canceled_at` was displayed as canceled. Foreign-key cascades covered scan progress/artifacts, finding occurrences and dependent records, deep workers and comparisons. `workspaces.active_scan_id` and child `parent_scan_id` became NULL.
+
+Deleting a scan alone did not remove orphaned `findings` identities. Non-cascading `finding_workflows.scan_id` and `scan_severity_classifications.scan_id` needed separate inspection. Shared findings, repository targets, workspaces, exported issues, and unrelated workflows must not be removed merely because they share a repository path. Deleting local publication links does not delete remote issues.
+
+Require exact user-selected UUIDs and an inspected dependency/artifact plan before deletion. Acquire completion locks, verify scans/workers are stopped, use a bounded transaction with foreign keys enabled, remove only now-unreferenced selected-scan records, and validate integrity. Delete only exact authorized artifact directories and matching lock files; do not clear application caches or all chats to try to remove scans. Report that findings/analysis were removed and that transcripts, logs, snapshots, backups, or cloud stores may still retain references. GUI cache refresh may require reopening Security or restarting the app; database readback alone is not visual GUI verification.

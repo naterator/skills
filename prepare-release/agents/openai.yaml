@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prepare Release"
+  short_description: "Validate builds, TestFlight, store assets, and docs"
+  default_prompt: "Use $prepare-release for this project: validate every supported platform, prepare TestFlight and store materials where applicable, refresh documentation, then commit and push all eligible files without submitting any Apple review request."

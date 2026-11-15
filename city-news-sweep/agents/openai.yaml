@@ -1,0 +1,4 @@
+interface:
+  display_name: "City News Sweep"
+  short_description: "Exhaustive, deduplicated local news research"
+  default_prompt: "Use $city-news-sweep to find and deduplicate public news for a location and timeframe."

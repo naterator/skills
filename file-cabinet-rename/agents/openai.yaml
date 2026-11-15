@@ -1,0 +1,4 @@
+interface:
+  display_name: "File Cabinet Rename"
+  short_description: "Rename files to a cabinet-friendly format"
+  default_prompt: "Use $file-cabinet-rename to rename files in this folder without changing their contents."

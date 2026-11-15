@@ -1,0 +1,4 @@
+interface:
+  display_name: "New Todo"
+  short_description: "Add Things reminders with a link to this chat"
+  default_prompt: "Use $new-todo to remind me to [item] at [time], with a link to this chat in the notes."

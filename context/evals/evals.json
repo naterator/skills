@@ -24,7 +24,8 @@
       "assertions": [
         "Reads atlas README, applicable instructions and recent CHANGELOG entries.",
         "Verifies the configured atlas project directory with pwd using that workdir and adopts it for subsequent work.",
-        "Does not edit files, run stored diagnostics or scan unrelated subjects."
+        "Does not edit files, run stored diagnostics or scan unrelated subjects.",
+        "Does not require or create a project CHANGELOG outside the selected Context collection after adopting the project working directory."
       ]
     },
     {
@@ -38,7 +39,8 @@
         "Performs complete destination discovery before saving and reuses atlas rather than creating a competing topic.",
         "Saves only the supplied finding with appropriate provenance and updates atlas CHANGELOG with links.",
         "Preserves the original chat directory and the existing saved atlas working-directory mapping.",
-        "Does not change unrelated subjects or claim to have independently executed the parser check."
+        "Does not change unrelated subjects or claim to have independently executed the parser check.",
+        "Updates only the collection topic changelog; does not create or update a CHANGELOG in the linked project outside the collection."
       ]
     },
     {

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Screen Lock"
+  short_description: "Lock your macOS workstation screen"
+  default_prompt: "Use $screen-lock to lock the screen of my workstation."

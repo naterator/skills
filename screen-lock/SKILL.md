@@ -1,9 +1,9 @@
 ---
-name: lock-screen
+name: screen-lock
 description: Lock the user's macOS workstation when they ask to lock the screen, computer, or workstation, and verify the actual console lock state when available.
 ---
 
-# Lock Screen
+# Screen Lock
 
 ## Dependency preflight
 

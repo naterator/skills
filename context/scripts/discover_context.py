@@ -177,7 +177,7 @@ def discover(root, topic, aliases=()):
 
     try:
         result['root_exists'] = root.exists()
-        if root.is_symlink():
+        if root != DEFAULT_ROOT and root.is_symlink():
             error(root, 'Context root is a symlink; confirm the resolved root and rerun explicitly')
         elif not result['root_exists']:
             error(root, 'Context root does not exist or is inaccessible; no content was scanned')

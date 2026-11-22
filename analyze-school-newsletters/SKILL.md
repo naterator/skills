@@ -1,9 +1,9 @@
 ---
 name: analyze-school-newsletters
-description: "Analyze school newsletters, teacher emails, calendars, and academic materials for a configured family. Use for school updates, upcoming tests or assignments, home study guidance, parent priorities, timeline updates, or changes between communications."
+description: "Analyze school communications, newsletters, teacher emails, calendars, and academic materials for a configured family. Use for school updates, upcoming tests or assignments, home study guidance, parent priorities, timeline or date lookups, or changes between communications."
 ---
 
-# Analyze School Newsletters
+# Analyze School Communications
 
 ## Dependency preflight
 
@@ -25,11 +25,13 @@ The public configuration intentionally has no family profile or exclusions. Obta
 
 Honor exclusions throughout every user-visible output, including summaries, tables, citations, source lists, action items, and saved reports. Do not mention topics merely to announce their exclusion. A user's explicit request about an excluded topic overrides only the relevant exclusion for that request. Apply exclusions to the specific topic, not unrelated content in the same document; lunch procedures and academic enrichment can still matter.
 
+If `sources.default_directory` is configured, inspect that directory for relevant new or updated school materials during an ordinary analysis, along with any materials supplied in the request. Report an unavailable configured directory when it affects coverage. An explicit source-only request limits the analysis to the named source or sources and leaves the configured directory out; an explicit read-only request may inspect configured sources but must not write or update anything.
+
 Choose the requested scope:
 
 - **Comprehensive school update:** use [references/briefing-template.md](references/briefing-template.md), repeating the child-specific sections for each relevant student and covering schoolwide information.
 - **Focused question:** answer the requested test, subject, project, changes, or priorities without producing an unnecessary full briefing. Keep a short executive takeaway and a confidence assessment.
-- **Timeline only:** provide the chronological table, with brief confidence and source notes; do not add academic sections.
+- **Timeline or date lookup:** use the configured shared date index when it is in scope, together with relevant current sources. For a particular date, include each applicable event, deadline, and covering date range with its audience and status.
 
 Accept single documents or large batches of newsletters, emails, announcements, PDFs, calendars, policies, photographs, screenshots, assignments, rubrics, study guides, reviews, practice assessments, and answer keys. No naming convention is required. Use supplied files, accessible task materials, and relevant available prior reports. If no usable source is available, request the relevant materials. Never ask the parent to repeat configuration already recorded here.
 
@@ -37,7 +39,7 @@ Accept single documents or large batches of newsletters, emails, announcements, 
 
 ### 1. Inventory and read
 
-Build a working inventory of every supplied source: filename or identifier, type, sender or author, publication date, audience, student/grade, subject or administrative category, new versus historical role, and embedded or linked resources. Establish relationships such as email → newsletter → review packet → answer key or project → rubric. Record whether a referenced resource was supplied, accessed through a link, or remains unavailable; a mention of a worksheet does not mean its contents were examined. Do not equate a file's modification date with its communication date.
+Build a working inventory of every source in scope: filename or identifier, type, sender or author, publication date, audience, student/grade, subject or administrative category, new versus historical role, and embedded or linked resources. Establish relationships such as email → newsletter → review packet → answer key or project → rubric. Record whether a referenced resource was supplied, accessed through a link, or remains unavailable; a mention of a worksheet does not mean its contents were examined. Do not equate a file's modification date with its communication date.
 
 Read every relevant document completely. Use extraction to navigate, then inspect images wherever tables, calendars, diagrams, question layouts, small print, scans, or handwriting could change the meaning. For PDFs, use the available PDF workflow, text extraction, and page rendering; record physical page numbers for citations. Read academic packets and rubrics beyond their first pages.
 
@@ -83,6 +85,15 @@ Label **Required homework**, **Optional school-provided practice**, and **Sugges
 
 Translate relevant facts into a parent checklist grouped **Urgent**, **This Week**, and **Upcoming**. Each item needs a meaningful action, child/audience, deadline if known, and reason. Label optional suggestions. Include changes or unresolved issues in attendance, absence reporting, arrival/dismissal, safety, school portals, dismissal systems, lunch ordering, visitors, daily materials, weather procedures, and schedules where consequential. Avoid action items for routine announcements needing no parent involvement.
 
+## Shared date index
+
+When `records.dates_file` is configured, expand `~` against the current host's home directory and read the resulting file at the start of date-aware analysis and date lookup when it is in scope. On an ordinary review, merge newly evidenced dates only when the user has configured the file for persistence and the request does not limit work to supplied sources or prohibit writes. A source-only request leaves the index untouched. A read-only request may read it when in scope but must not initialize or update it. If persistence is in scope and the file is missing, initialize it at the configured path when its parent directory is accessible and writable; if it cannot be read or written, report that limitation and provide supported date changes in the answer.
+
+- Use ascending school-local ISO date headings (`YYYY-MM-DD · Weekday`) with applicable entries beneath each. Record inclusive multi-day periods once in **Date ranges**; for a particular date, check both its heading and all ranges covering it.
+- For each entry, record the event or finding, student or shared audience, grade or school year when relevant, time if known, status, and a precise source. Include due dates, tests, classroom and campus events, schedule or procedure changes, and substantive dated findings. Distinguish event, deadline, and announcement dates. Record a meaningful announcement on its known date when the event date is missing. Keep genuinely undated items out of dated entries.
+- Merge repeat notices by event and audience. Reread the current file before saving, preserve unrelated entries and credible history, and mark corrections, cancellations, or conflicting dates explicitly with their sources. A past date alone cannot establish occurrence, attendance, completion, or results.
+- Apply configured exclusions to the persistent reference. Keep it at the configured location rather than moving it into a source folder or per-chat workspace. Leave it untouched when the review adds no new evidence.
+
 ## Report and verify
 
 Start reports with an executive summary as the first substantive section. Keep dates and comparisons in readable Markdown tables, action items in checklists, and explanations in short paragraphs. Use restrained emphasis for imminent tests and deadlines. Be detailed enough to replace reading the whole batch, while letting the parent quickly find the important developments.
@@ -104,13 +115,14 @@ If evidence prevents a check from passing, state the practical limitation and co
 
 ## Reuse and maintenance
 
-Invoke as `$analyze-school-newsletters` or request a matching school analysis; automatic selection remains enabled. Examples:
+Invoke as `$analyze-school-newsletters` (the public skill ID remains stable) or request a matching school analysis; automatic selection remains enabled. Examples:
 
 - "Use $analyze-school-newsletters to analyze these newsletters and teacher emails."
 - "Use $analyze-school-newsletters to tell me what my child should study for science."
 - "Use $analyze-school-newsletters to show what changed and update our upcoming timeline."
+- "Use $analyze-school-newsletters to tell me what is happening on December 16."
 
-To update defaults, edit this skill's `config.yaml` or ask Codex to update the family profile, school year, reporting preferences, or exclusions. Keep the stated school year with each grade and preserve unrelated settings. Adjust report layout in `references/briefing-template.md` and academic procedures in `references/academic-analysis.md` when requested.
+To update defaults, edit this skill's `config.yaml` or ask Codex to update the optional source directory, shared date-index path, family profile, school year, reporting preferences, or exclusions. Keep the stated school year with each grade and preserve unrelated settings. Adjust report layout in `references/briefing-template.md` and academic procedures in `references/academic-analysis.md` when requested.
 
 ## Dependencies and portability
 

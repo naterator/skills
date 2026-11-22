@@ -208,6 +208,22 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(result['root'], str(self.root))
         self.assertEqual(result['summary']['matching_files'], 1)
 
+    def test_cli_resolves_default_collection_symlink(self):
+        self.write('physical/printer/README.md', 'Current printer')
+        target = self.root / 'physical'
+        alias = self.root / 'context'
+        alias.symlink_to(target, target_is_directory=True)
+        with mock.patch.object(discovery, 'DEFAULT_ROOT', alias):
+            for options in ([], ['--root', str(alias)]):
+                with self.subTest(options=options):
+                    output = io.StringIO()
+                    with redirect_stdout(output):
+                        status = discovery.main([*options, '--topic', 'printer'])
+                    self.assertEqual(status, 0)
+                    result = json.loads(output.getvalue())
+                    self.assertEqual(result['root'], str(target))
+                    self.assertEqual(result['summary']['matching_files'], 1)
+
     def test_cli_missing_default_collection_stops_without_creating_it(self):
         missing = self.root / 'Documents' / 'Context'
         output = io.StringIO()

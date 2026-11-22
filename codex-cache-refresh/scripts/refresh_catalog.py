@@ -127,9 +127,9 @@ def other_rows(conn, hosts):
     ))
 
 
-def backup_database(conn, db_path):
+def backup_database(conn, db_path, *, label="backup"):
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    path = db_path.with_name(f"{db_path.stem}.backup-{stamp}-{uuid4().hex[:8]}.db")
+    path = db_path.with_name(f"{db_path.stem}.{label}-{stamp}-{uuid4().hex[:8]}.db")
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     os.close(fd)
     try:

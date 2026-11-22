@@ -77,7 +77,9 @@ The helper path above is relative to this skill's directory; resolve it to an ab
 The helper CLI also defaults to the current user's `~/Documents/Context` when
 `--root` is omitted. Explicit roots always override it. The agent should still
 pass its selected root explicitly so an alternative collection or test fixture
-cannot accidentally access the default.
+cannot accidentally access the default. Discovery follows the default path if
+it is a symlink and reports its resolved directory. For a different symlink
+root, confirm the target and pass the verified resolved directory explicitly.
 
 The full report includes paths, lexical matches, non-text entries, intentional exclusions, content roles and coverage errors; save large output to scratch space and inspect complete relevant sections instead of silently truncating it. Entries with a `.git` component (including resolved internal symlink targets) are intentionally excluded: repository history is not current topic content. Preserve discovery of other hidden entries, `.gitignore`, `.skills`, source notes and scripts. Completeness means coverage of this documented content scope, not Git internals.
 
@@ -155,6 +157,7 @@ Resolve the canonical destination before writing. Review existing topic material
 - For every newly created topic inside the selected Context collection, including nested and locator-only topics, create both a populated `README.md` and `CHANGELOG.md` during the initial save. For a locator topic, these files belong in its collection folder, not the linked project repository. Include the configured working directory and a changelog link in the README; record subject creation and link back to the README in the initial changelog entry, following the changelog convention above.
 - Organize a topic README with scope/status/reading map and focused notes as warranted. Synthesize rather than dumping the conversation or logs. Label retained historical notes and explain superseding evidence. Integrate new observations with dates, preserving useful evidence, uncertainty, unrelated material and existing instructions.
 - Preserve or record the default working directory using the convention above. For locator-only topics, link the canonical repository's `AGENTS.md`, `README.md` and starting handoff; keep detailed project context in that repository rather than copying it into Context.
+- Use relative Markdown links from the containing document for files within Context. For dated documents in other repositories, use a commit permalink from the repository’s Git host. Confirm the commit is available on that host and contains the cited file and any linked heading.
 - Keep Context small and text-only by default. Curate small useful source scripts/dependency lists under `scripts/`; record provenance, adaptations, inputs/outputs, portability, dependencies and live/mutating behavior. Keep firmware, PCAPs, media, executables/native libraries, archives, databases and bulk exports in their existing preservation locations and link/index them. Verify external artifact existence/integrity when practical. Never copy credentials, private keys, tokens or browser authentication state.
 - Maintain a concise canonical topic catalogue in the root `README.md`; keep `AGENTS.md` focused on instructions. Preserve unrelated catalogue entries and repository rules; include scope/aliases and cross-link distinct related topics. The catalogue does not replace future discovery.
 

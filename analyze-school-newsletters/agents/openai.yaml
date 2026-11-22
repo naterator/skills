@@ -1,4 +1,4 @@
 interface:
   display_name: "School Communications & Academic Intelligence"
-  short_description: "School updates, study plans, deadlines, and changes"
-  default_prompt: "Use $analyze-school-newsletters to analyze the supplied school communications for my family and prioritize what needs attention."
+  short_description: "School communications, dates, study plans, and changes"
+  default_prompt: "Use $analyze-school-newsletters to analyze the supplied school communications, answer relevant date lookups, and prioritize what needs attention."

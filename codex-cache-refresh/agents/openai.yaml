@@ -1,3 +1,3 @@
 interface:
   display_name: "Codex Cache Refresh"
-  short_description: "Clear stale ChatGPT Recents entries while preserving Codex tasks"
+  short_description: "Check and remove stale Recents references while preserving chats"

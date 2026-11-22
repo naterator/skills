@@ -13,9 +13,19 @@ family:
   students: []
   profile_refresh: "Use clear newer school documents or user corrections. Ask when uncertainty affects the analysis; never assume old grade levels remain current indefinitely."
 
+sources:
+  # Optional. Set this to a user-controlled directory of school materials.
+  # Leave null to analyze only supplied or explicitly selected sources.
+  default_directory: null
+
+records:
+  # Optional. Set this to a shared Markdown date index when persistent date
+  # lookups and updates are wanted. Leave null to avoid persistent records.
+  dates_file: null
+
 reporting:
   default_scope: "comprehensive"
-  focused_requests: "Answer only the requested question or timeline while preserving evidence, uncertainty, dates, and confidence standards."
+  focused_requests: "Answer only the requested question, timeline, or date lookup while preserving evidence, uncertainty, dates, and confidence standards."
   briefing_template: "references/briefing-template.md"
   emphasis:
     - "Academic development and documented curriculum progression"
